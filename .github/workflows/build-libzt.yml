@@ -3,8 +3,6 @@ name: Build libzt (iOS)
 on:
   workflow_dispatch:
   push:
-    paths:
-      - '.github/workflows/build-libzt.yml'
     branches:
       - main
 
@@ -22,23 +20,14 @@ jobs:
       - name: Install CMake
         run: brew install cmake
 
-      # ✅ 修复：直接使用 ${{ github.workspace }} 作为拉取路径，不再用 /tmp
-      - name: Checkout libzt source (Your Fork)
+      - name: Checkout source (Your Fork)
         uses: actions/checkout@v4
-        with:
-          path: ${{ github.workspace }}
 
-      - name: Patch CMakeLists.txt for CMake 3.5+
-        run: |
-          cd ${{ github.workspace }}
-          sed -i '' 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.5)/' CMakeLists.txt
-
-      # ✅ 修复：统一使用 ${{ github.workspace }}
       - name: Create build directory
-        run: mkdir -p ${{ github.workspace }}/build-ios
+        run: mkdir -p build-ios
 
       - name: Configure CMake (iOS arm64, Service mode)
-        working-directory: ${{ github.workspace }}/build-ios
+        working-directory: build-ios
         run: |
           cmake .. \
             -G "Xcode" \
@@ -56,36 +45,14 @@ jobs:
             -DCMAKE_C_FLAGS="-target arm64-apple-ios14.0" \
             -DCMAKE_CXX_FLAGS="-target arm64-apple-ios14.0 -stdlib=libc++"
 
-      # ✅ 修复：统一使用 ${{ github.workspace }}
       - name: Build libzt
-        working-directory: ${{ github.workspace }}/build-ios
+        working-directory: build-ios
         run: |
           cmake --build . --config Release --parallel $(sysctl -n hw.ncpu)
-
-      # ✅ 修复：统一使用 ${{ github.workspace }}
-      - name: Verify static library
-        run: |
-          find ${{ github.workspace }}/build-ios -name "*.a" -exec ls -lh {} \;
-          find ${{ github.workspace }}/build-ios -name "*.a" -exec file {} \;
-
-      # ✅ 修复：将输出产物也移动到 ${{ github.workspace }} 下
-      - name: Collect artifacts
-        run: |
-          mkdir -p ${{ github.workspace }}/artifacts/lib ${{ github.workspace }}/artifacts/include
-          LIBZT_PATH=$(find ${{ github.workspace }}/build-ios -path "*/Release-iphoneos/libzt.a" | head -1)
-          if [ -z "$LIBZT_PATH" ]; then
-            LIBZT_PATH=$(find ${{ github.workspace }}/build-ios -name "libzt.a" | head -1)
-          fi
-          echo "Found library: $LIBZT_PATH"
-          cp "$LIBZT_PATH" ${{ github.workspace }}/artifacts/lib/libzt.a
-          cp ${{ github.workspace }}/include/*.h ${{ github.workspace }}/artifacts/include/ 2>/dev/null || true
-          cp -r ${{ github.workspace }}/include/* ${{ github.workspace }}/artifacts/include/ 2>/dev/null || true
-          ls -la ${{ github.workspace }}/artifacts/lib/
-          ls -la ${{ github.workspace }}/artifacts/include/
 
       - name: Upload libzt.a artifact
         uses: actions/upload-artifact@v4
         with:
           name: libzt-ios-arm64
-          path: ${{ github.workspace }}/artifacts/
+          path: build-ios/Release-iphoneos/
           retention-days: 90

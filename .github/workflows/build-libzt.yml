@@ -20,7 +20,6 @@ jobs:
       - name: Install CMake
         run: brew install cmake
 
-      # 👇 核心修改：加上 submodules: 'recursive' 拉取所有子模块
       - name: Checkout source (Your Fork)
         uses: actions/checkout@v4
         with:
@@ -40,6 +39,8 @@ jobs:
             -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
             -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_SHARED_LIB=OFF \
+            -DBUILD_IOS_FRAMEWORK=ON \
             -DZTS_ENABLE_NETWORKNEEDS=OFF \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
@@ -53,9 +54,24 @@ jobs:
         run: |
           cmake --build . --config Release --parallel $(sysctl -n hw.ncpu)
 
+      # ✨ 核心修复：无论 Xcode 把产物生成在哪个深层目录，都能找到并统一挪到 uploads 文件夹
+      - name: Find and prepare libzt.a
+        run: |
+          echo "Searching for built library..."
+          LIBZT_PATH=$(find build-ios -name "libzt.a" -type f | head -n 1)
+          if [ -z "$LIBZT_PATH" ]; then
+            echo "::error::libzt.a not found! Build step failed."
+            exit 1
+          fi
+          echo "Found library at: $LIBZT_PATH"
+          mkdir -p uploads
+          cp "$LIBZT_PATH" uploads/libzt.a
+          echo "Successfully prepared uploads/libzt.a"
+
+      # ✨ 核心修复：明确指定统一的 uploads 文件夹
       - name: Upload libzt.a artifact
         uses: actions/upload-artifact@v4
         with:
           name: libzt-ios-arm64
-          path: build-ios/Release-iphoneos/
+          path: uploads/
           retention-days: 90

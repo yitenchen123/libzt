@@ -20,8 +20,11 @@ jobs:
       - name: Install CMake
         run: brew install cmake
 
+      # 👇 核心修改：加上 submodules: 'recursive' 拉取所有子模块
       - name: Checkout source (Your Fork)
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
       - name: Create build directory
         run: mkdir -p build-ios
